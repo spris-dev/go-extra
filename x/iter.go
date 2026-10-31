@@ -33,6 +33,21 @@ func (it IterWrapper[T]) Map[R any](f func(T) R) IterWrapper[R] {
 	}
 }
 
+// MapIndex transforms each value in the iterator with its index.
+func (it IterWrapper[T]) MapIndex[R any](f func(T, int) R) IterWrapper[R] {
+	return IterWrapper[R]{
+		func(yield func(R) bool) {
+			i := -1
+			for v := range it.seq {
+				i += 1
+				if !yield(f(v, i)) {
+					return
+				}
+			}
+		},
+	}
+}
+
 // Filter returns the values that satisfy cond.
 func (it IterWrapper[T]) Filter(cond func(T) bool) IterWrapper[T] {
 	return IterWrapper[T]{
@@ -50,10 +65,40 @@ func (it IterWrapper[T]) Filter(cond func(T) bool) IterWrapper[T] {
 	}
 }
 
+// FilterIndex returns the values for which cond, given the value and index, is true.
+func (it IterWrapper[T]) FilterIndex(cond func(T, int) bool) IterWrapper[T] {
+	return IterWrapper[T]{
+		func(yield func(T) bool) {
+			i := -1
+			for v := range it.seq {
+				i += 1
+				if !cond(v, i) {
+					continue
+				}
+
+				if !yield(v) {
+					return
+				}
+			}
+		},
+	}
+}
+
 // Fold reduces the values in the iterator into an accumulator.
 func (it IterWrapper[T]) Fold[R any](r R, f func(R, T) R) R {
 	for v := range it.seq {
 		r = f(r, v)
+	}
+
+	return r
+}
+
+// FoldIndex reduces the values in the iterator into an accumulator with each index.
+func (it IterWrapper[T]) FoldIndex[R any](r R, f func(R, T, int) R) R {
+	i := -1
+	for v := range it.seq {
+		i += 1
+		r = f(r, v, i)
 	}
 
 	return r

@@ -11,34 +11,66 @@ import (
 func TestMap(t *testing.T) {
 	t.Run("transforms values", func(t *testing.T) {
 		in := []int{1, 2, 3, 4}
-		want := []int{2, 4, 6, 8}
 
-		got := x.Iter(in).
-			Map(func(v int) int { return v * 2 }).
-			Collect()
+		t.Run("Map", func(t *testing.T) {
+			want := []int{2, 4, 6, 8}
+			got := x.Iter(in).
+				Map(func(v int) int { return v * 2 }).
+				Collect()
 
-		tassert.EmptyDiff(t, want, got)
+			tassert.EmptyDiff(t, want, got)
+		})
+
+		t.Run("MapIndex", func(t *testing.T) {
+			want := []int{1, 3, 5, 7}
+			got := x.Iter(in).
+				MapIndex(func(v, i int) int { return v + i }).
+				Collect()
+
+			tassert.EmptyDiff(t, want, got)
+		})
 	})
 
 	t.Run("changes type", func(t *testing.T) {
 		in := []int{1, 2, 3}
-		want := []string{"a", "b", "c"}
 
-		got := x.Iter(in).
-			Map(func(v int) string { return string(rune('a' + v - 1)) }).
-			Collect()
+		t.Run("Map", func(t *testing.T) {
+			want := []string{"a", "b", "c"}
+			got := x.Iter(in).
+				Map(func(v int) string { return string(rune('a' + v - 1)) }).
+				Collect()
 
-		tassert.EmptyDiff(t, want, got)
+			tassert.EmptyDiff(t, want, got)
+		})
+
+		t.Run("MapIndex", func(t *testing.T) {
+			want := []string{"a", "b", "c"}
+			got := x.Iter(in).
+				MapIndex(func(v int, _ int) string { return string(rune('a' + v - 1)) }).
+				Collect()
+
+			tassert.EmptyDiff(t, want, got)
+		})
 	})
 
 	t.Run("empty input", func(t *testing.T) {
 		want := []int{}
 
-		got := x.Iter[int](nil).
-			Map(func(v int) int { return v + 1 }).
-			Collect()
+		t.Run("Map", func(t *testing.T) {
+			got := x.Iter[int](nil).
+				Map(func(v int) int { return v + 1 }).
+				Collect()
 
-		tassert.EmptyDiff(t, want, got, cmpopts.EquateEmpty())
+			tassert.EmptyDiff(t, want, got, cmpopts.EquateEmpty())
+		})
+
+		t.Run("MapIndex", func(t *testing.T) {
+			got := x.Iter[int](nil).
+				MapIndex(func(v int, _ int) int { return v + 1 }).
+				Collect()
+
+			tassert.EmptyDiff(t, want, got, cmpopts.EquateEmpty())
+		})
 	})
 }
 
@@ -65,24 +97,45 @@ func FuzzMap(f *testing.F) {
 func TestFilter(t *testing.T) {
 	t.Run("keeps matching values", func(t *testing.T) {
 		in := []int{1, 2, 3, 4}
-		want := []int{2, 4}
 
-		got := x.Iter(in).
-			Filter(func(v int) bool { return v%2 == 0 }).
-			Collect()
+		t.Run("Filter", func(t *testing.T) {
+			want := []int{2, 4}
+			got := x.Iter(in).
+				Filter(func(v int) bool { return v%2 == 0 }).
+				Collect()
 
-		tassert.EmptyDiff(t, want, got)
+			tassert.EmptyDiff(t, want, got)
+		})
+
+		t.Run("FilterIndex", func(t *testing.T) {
+			want := []int{1, 3}
+			got := x.Iter(in).
+				FilterIndex(func(_ int, i int) bool { return i%2 == 0 }).
+				Collect()
+
+			tassert.EmptyDiff(t, want, got)
+		})
 	})
 
 	t.Run("no matches", func(t *testing.T) {
 		in := []int{1, 3, 5}
 		want := []int{}
 
-		got := x.Iter(in).
-			Filter(func(v int) bool { return v%2 == 0 }).
-			Collect()
+		t.Run("Filter", func(t *testing.T) {
+			got := x.Iter(in).
+				Filter(func(v int) bool { return v%2 == 0 }).
+				Collect()
 
-		tassert.EmptyDiff(t, want, got, cmpopts.EquateEmpty())
+			tassert.EmptyDiff(t, want, got, cmpopts.EquateEmpty())
+		})
+
+		t.Run("FilterIndex", func(t *testing.T) {
+			got := x.Iter(in).
+				FilterIndex(func(_ int, i int) bool { return i < 0 }).
+				Collect()
+
+			tassert.EmptyDiff(t, want, got, cmpopts.EquateEmpty())
+		})
 	})
 }
 
@@ -111,31 +164,60 @@ func FuzzFilter(f *testing.F) {
 func TestFold(t *testing.T) {
 	t.Run("accumulates values", func(t *testing.T) {
 		in := []int{1, 2, 3, 4}
-		want := 10
 
-		got := x.Iter(in).
-			Fold(0, func(sum, v int) int { return sum + v })
+		t.Run("Fold", func(t *testing.T) {
+			want := 10
+			got := x.Iter(in).
+				Fold(0, func(sum, v int) int { return sum + v })
 
-		tassert.Equal(t, want, got)
+			tassert.Equal(t, want, got)
+		})
+
+		t.Run("FoldIndex", func(t *testing.T) {
+			want := 20
+			got := x.Iter(in).
+				FoldIndex(0, func(sum, v, i int) int { return sum + v*i })
+
+			tassert.Equal(t, want, got)
+		})
 	})
 
 	t.Run("uses initial value for empty input", func(t *testing.T) {
 		want := 10
 
-		got := x.Iter[int](nil).
-			Fold(10, func(sum, v int) int { return sum + v })
+		t.Run("Fold", func(t *testing.T) {
+			got := x.Iter[int](nil).
+				Fold(10, func(sum, v int) int { return sum + v })
 
-		tassert.Equal(t, want, got)
+			tassert.Equal(t, want, got)
+		})
+
+		t.Run("FoldIndex", func(t *testing.T) {
+			got := x.Iter[int](nil).
+				FoldIndex(10, func(sum, v, _ int) int { return sum + v })
+
+			tassert.Equal(t, want, got)
+		})
 	})
 
 	t.Run("preserves iteration order", func(t *testing.T) {
 		in := []string{"a", "b", "c"}
-		want := "abc"
 
-		got := x.Iter(in).
-			Fold("", func(result, v string) string { return result + v })
+		t.Run("Fold", func(t *testing.T) {
+			want := "abc"
+			got := x.Iter(in).
+				Fold("", func(result, v string) string { return result + v })
 
-		tassert.Equal(t, want, got)
+			tassert.Equal(t, want, got)
+		})
+
+		t.Run("FoldIndex", func(t *testing.T) {
+			want := "abc"
+			got := x.Iter(in).
+				FoldIndex("", func(result, v string, _ int) string { return result + v })
+
+			tassert.Equal(t, want, got)
+		})
 	})
 }
 

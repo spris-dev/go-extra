@@ -23,3 +23,12 @@ func EmptyDiff(t testing.TB, want, got any, opts ...cmp.Option) {
 		t.Errorf("Diff mismatch (-want +got):\n%s", diff)
 	}
 }
+
+// True reports an error when cond is false.
+func True(t testing.TB, cond bool, format string, args ...any) {
+	t.Helper()
+
+	if !cond {
+		t.Errorf(format, args...)
+	}
+}
