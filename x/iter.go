@@ -1,8 +1,12 @@
 package x
 
 import (
+	"context"
+	"errors"
 	"iter"
 	"slices"
+
+	"golang.org/x/sync/errgroup"
 )
 
 // IterWrapper provides operations over an iterator sequence.
@@ -134,4 +138,82 @@ func (it IterWrapper[T]) Every(cond func(T) bool) bool {
 // Collect returns the iterator values as a slice.
 func (it IterWrapper[T]) Collect() []T {
 	return slices.Collect(it.seq)
+}
+
+// Go runs f concurrently for each value. Results and errors are in input order; an error does not stop other calls.
+func (it IterWrapper[T]) Go[R any](f func(val T) (R, error)) ([]R, []error) {
+	input := it.Collect()
+	results := make([]R, len(input))
+	errors := make([]error, len(input))
+
+	g := new(errgroup.Group)
+
+	for i, val := range input {
+		g.Go(func() error {
+			res, err := f(val)
+
+			if err != nil {
+				errors[i] = err
+			} else {
+				results[i] = res
+			}
+
+			return nil
+		})
+	}
+
+	g.Wait()
+
+	return results, errors
+}
+
+// GoCtx runs f concurrently for each value with ctx and returns the first error.
+func (it IterWrapper[T]) GoCtx[R any](ctx context.Context, f func(ctx context.Context, val T) (R, error)) ([]R, error) {
+	return it.GoCtxWithLimit(ctx, -1, f)
+}
+
+// GoCtxWithLimit runs f concurrently with at most limit calls at once using ctx.
+// A negative limit is unlimited; zero is invalid. It returns the first error.
+func (it IterWrapper[T]) GoCtxWithLimit[R any](ctx context.Context, limit int, f func(ctx context.Context, val T) (R, error)) ([]R, error) {
+	if limit == 0 {
+		return nil, errors.New("limit must not be 0")
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
+	input := it.Collect()
+
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
+	results := make([]R, len(input))
+
+	g, ctx := errgroup.WithContext(ctx)
+	g.SetLimit(limit)
+
+	for i, val := range input {
+		g.Go(func() error {
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
+
+			res, err := f(ctx, val)
+
+			if err != nil {
+				return err
+			}
+
+			results[i] = res
+
+			return nil
+		})
+	}
+
+	if err := g.Wait(); err != nil {
+		return nil, err
+	}
+
+	return results, nil
 }
